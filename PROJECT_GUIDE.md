@@ -1,6 +1,6 @@
 # Instagram Analyzer — Complete Guide
 
-Automated daily analysis of **@nsk.rides** using the Instagram Graph API +
+Automated daily analysis of an Instagram account using the Instagram Graph API +
 Claude. Replaces manual weekly review: runs on your VPS on a schedule, stores
 every analysis by date, and keeps the raw data for re-analysis.
 
@@ -107,7 +107,7 @@ nano .env
 ```
 IG_TOKEN=your_long_lived_token
 IG_USER_ID=your_numeric_business_account_id
-IG_HANDLE=nsk.rides
+IG_HANDLE=your_handle
 IG_API_BASE=https://graph.facebook.com/v21.0
 IG_TIMEZONE=Asia/Kolkata
 ANTHROPIC_API_KEY=your_api_key

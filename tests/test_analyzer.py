@@ -236,7 +236,7 @@ def test_accumulate_metrics_sums_across_windows():
 
 def test_render_markdown_includes_trend_table_and_warnings():
     data = {
-        "handle": "nsk.rides",
+        "handle": "example",
         "days_lookback": 30,
         "account": {"followers_count": 1200},
         "media": [make_post()],
@@ -255,7 +255,7 @@ def test_render_markdown_includes_trend_table_and_warnings():
     }
     out = main.render_markdown(data, "BODY", datetime(2025, 6, 15, 6, 0))
 
-    assert "@nsk.rides" in out
+    assert "@example" in out
     assert "| Followers | 1000 | 1200 | +200 (+20.0%) |" in out
     assert "IG_TOKEN expires in 3 day(s)" in out
     assert "audience.age: 400" in out

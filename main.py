@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Instagram Analyzer — automated daily analysis of @nsk.rides via the Instagram
-Graph API + Claude.
+"""Instagram Analyzer — automated daily analysis of an Instagram account via
+the Instagram Graph API + Claude.
 
 Pipeline: collect account/media/audience insights -> derive local aggregates ->
 diff against the previous run -> send to Claude -> store a tactical markdown
@@ -77,7 +77,7 @@ load_dotenv(BASE_DIR / ".env")
 IG_TOKEN = os.getenv("IG_TOKEN", "")
 IG_USER_ID = os.getenv("IG_USER_ID", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-ACCOUNT_HANDLE = os.getenv("IG_HANDLE", "nsk.rides")
+ACCOUNT_HANDLE = os.getenv("IG_HANDLE", "your_handle")
 
 # graph.facebook.com is the host that serves insights. If you set up "Instagram
 # API with Instagram Login", switch this to https://graph.instagram.com.

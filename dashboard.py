@@ -30,7 +30,7 @@ BASE_DIR = Path(__file__).resolve().parent
 ANALYSES_DIR = BASE_DIR / "data" / "analyses"
 RAW_DIR = BASE_DIR / "data" / "raw"
 
-HANDLE = os.getenv("IG_HANDLE", "nsk.rides")
+HANDLE = os.getenv("IG_HANDLE", "your_handle")
 
 # analysis_HHMMSS.md, written by main.save_results()
 ANALYSIS_RE = re.compile(r"^analysis_\d{6}\.md$")

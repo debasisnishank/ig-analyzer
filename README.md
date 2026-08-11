@@ -1,6 +1,6 @@
 # Instagram Analyzer
 
-Automated daily analysis of **@nsk.rides** Instagram performance using the
+Automated daily analysis of an Instagram account's performance using the
 Instagram Graph API + Claude. Pulls account, post, and audience insights,
 computes the aggregates locally, diffs them against the previous run, sends the
 lot to Claude, and stores a tactical markdown report per run — no manual

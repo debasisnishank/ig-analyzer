@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Trends — IG Analyzer</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, system-ui, sans-serif; margin: 0;
+      background: #0f1115; color: #e6e6e6; }
+    header { padding: 1rem 2rem; background: #171a21; border-bottom: 1px solid #262b36; }
+    header h1 { margin: 0 0 .25rem; font-size: 1.15rem; }
+    header a { color: #8ab4f8; text-decoration: none; font-size: .8rem; }
+    main { padding: 1.5rem 2rem; overflow-x: auto; }
+    table { border-collapse: collapse; font-size: .88rem; }
+    th, td { border: 1px solid #2a2f3a; padding: .45rem .7rem; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    th { background: #171a21; color: #8a93a3; font-weight: 600; }
+    .empty { color: #8a93a3; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📈 Trends — @{{ handle }}</h1>
+    <a href="/">← Back to reports</a>
+  </header>
+  <main>
+    {% if rows %}
+      <table>
+        <thead>
+          <tr>
+            <th>Collected (UTC)</th>
+            <th>Followers</th>
+            <th>Posts analyzed</th>
+            <th>Avg engagement rate</th>
+            <th>Avg reach / post</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.collected_at or '—' }}</td>
+              <td>{{ r.followers if r.followers is not none else '—' }}</td>
+              <td>{{ r.posts }}</td>
+              <td>{{ r.avg_engagement_rate if r.avg_engagement_rate is not none else '—' }}</td>
+              <td>{{ r.avg_reach if r.avg_reach is not none else '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="empty">No stored snapshots yet. Run <code>python main.py</code>.</p>
+    {% endif %}
+  </main>
+</body>
+</html>

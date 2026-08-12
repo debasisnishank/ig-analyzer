@@ -1,30 +1,25 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ date }} — IG Analyzer</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body { font-family: -apple-system, system-ui, sans-serif; margin: 0;
-      background: #0f1115; color: #e6e6e6; }
-    header { padding: 1rem 2rem; background: #171a21; border-bottom: 1px solid #262b36; }
-    header a { color: #8ab4f8; text-decoration: none; font-size: .85rem; }
-    main { padding: 1.5rem 2rem; }
-    .report { max-width: 820px; line-height: 1.6; }
-    .report pre { background: #171a21; padding: 1rem; border-radius: 8px; overflow-x: auto; }
-    .report code { background: #171a21; padding: .1rem .3rem; border-radius: 4px; }
-    .report table { border-collapse: collapse; }
-    .report th, .report td { border: 1px solid #2a2f3a; padding: .4rem .6rem; }
-  </style>
-</head>
-<body>
-  <header>
-    <a href="/">← Back</a> &nbsp;·&nbsp;
-    <a href="/download/{{ date }}/{{ filename }}">Download raw JSON</a>
-  </header>
-  <main>
-    <div class="report">{{ html|safe }}</div>
-  </main>
-</body>
-</html>
+{% extends "base.html" %}
+{% set active = 'report' %}
+{% block title %}{{ date }} — {{ handle }}{% endblock %}
+
+{% block content %}
+  <section aria-label="Runs">
+    <h2 class="sec">Runs</h2>
+    <div class="runs">
+      {% for a in analyses %}
+        <a class="run" href="/analysis/{{ a.date }}/{{ a.filename }}"
+           {% if a.date == date and a.filename == filename %}aria-current="page"{% endif %}>
+          <span class="d">{{ a.date[5:] }}</span>
+          <span class="t">{{ a.time }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section aria-label="Report">
+    <h2 class="sec">
+      {{ date }} · <a href="/download/{{ date }}/{{ filename }}">raw JSON</a>
+    </h2>
+    <article class="report">{{ html|safe }}</article>
+  </section>
+{% endblock %}

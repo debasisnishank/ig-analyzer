@@ -316,7 +316,7 @@ def test_dashboard_rejects_unsafe_paths(date, filename):
     from werkzeug.exceptions import HTTPException
 
     with pytest.raises(HTTPException):
-        dashboard._safe_analysis_path(date, filename)
+        dashboard._report_path(date, filename)
 
 
 def test_dashboard_escapes_html_in_reports():
@@ -326,3 +326,117 @@ def test_dashboard_escapes_html_in_reports():
     rendered = dashboard._render_md("caption: <script>alert(1)</script>")
     assert "<script>" not in rendered
     assert "&lt;script&gt;" in rendered
+
+
+# --------------------------------------------------------------------------- #
+# JSON API — the surface a mobile app reads
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def api_client(monkeypatch):
+    pytest.importorskip("flask")
+    monkeypatch.setenv("API_TOKEN", "test-token")
+    import importlib
+    import api as api_mod
+    import dashboard as dash_mod
+
+    importlib.reload(api_mod)
+    importlib.reload(dash_mod)
+    return dash_mod.app.test_client()
+
+
+AUTH = {"Authorization": "Bearer test-token"}
+
+
+def test_api_requires_a_token(api_client):
+    assert api_client.get("/api/v1/summary").status_code == 401
+    assert api_client.get("/api/v1/runs").status_code == 401
+
+
+def test_api_rejects_a_wrong_token(api_client):
+    r = api_client.get("/api/v1/summary", headers={"Authorization": "Bearer nope"})
+    assert r.status_code == 401
+    assert r.get_json()["error"]["code"] == "unauthorized"
+
+
+def test_api_accepts_the_right_token(api_client):
+    assert api_client.get("/api/v1/summary", headers=AUTH).status_code == 200
+
+
+def test_api_health_needs_no_token_and_leaks_nothing(api_client):
+    body = api_client.get("/api/v1/health").get_json()
+    assert body["ok"] is True
+    # No account data on the unauthenticated endpoint.
+    assert "followers" not in str(body) and "handle" not in body
+
+
+def test_api_is_disabled_when_no_token_is_configured(monkeypatch):
+    pytest.importorskip("flask")
+    monkeypatch.delenv("API_TOKEN", raising=False)
+    import importlib
+    import api as api_mod
+    import dashboard as dash_mod
+
+    importlib.reload(api_mod)
+    importlib.reload(dash_mod)
+    r = dash_mod.app.test_client().get("/api/v1/summary")
+    assert r.status_code == 503
+    assert r.get_json()["error"]["code"] == "api_disabled"
+
+
+def test_api_rejects_unknown_metric(api_client):
+    r = api_client.get("/api/v1/series?metric=bogus", headers=AUTH)
+    assert r.status_code == 400
+    assert "followers" in r.get_json()["error"]["supported"]
+
+
+def test_api_run_detail_404s_on_traversal(api_client):
+    for bad in ["../../etc/passwd", "2026-13-99_999999", "nope"]:
+        assert api_client.get(f"/api/v1/runs/{bad}", headers=AUTH).status_code == 404
+
+
+# --------------------------------------------------------------------------- #
+# store — run id handling
+# --------------------------------------------------------------------------- #
+
+
+def test_store_run_id_roundtrip():
+    import store
+
+    rid = store.run_id_for("2026-08-11", "analysis_225933.md")
+    assert rid == "2026-08-11_225933"
+    assert store.split_run_id(rid) == ("2026-08-11", "analysis_225933.md")
+
+
+@pytest.mark.parametrize(
+    "bad", ["../../etc", "2026-8-11_225933", "2026-08-11_9999", "", "nope"]
+)
+def test_store_rejects_malformed_run_ids(bad):
+    import store
+
+    assert store.split_run_id(bad) is None
+    assert store.report_path(bad) is None
+
+
+def test_store_stat_reports_delta_and_range():
+    import store
+
+    rows = [
+        {"collected_at": "2026-08-09T00:00:00+00:00", "followers": 100},
+        {"collected_at": "2026-08-10T00:00:00+00:00", "followers": 120},
+        {"collected_at": "2026-08-11T00:00:00+00:00", "followers": 150},
+    ]
+    s = store.stat(rows, "followers")
+    assert s["value"] == 150
+    assert s["delta"]["direction"] == "up" and s["delta"]["change"] == 30
+    assert s["range"]["low"] == 100 and s["range"]["position"] == 100.0
+
+
+def test_store_stat_omits_range_when_flat():
+    import store
+
+    rows = [{"collected_at": "x", "followers": 7} for _ in range(3)]
+    s = store.stat(rows, "followers")
+    assert "range" not in s
+    assert s["delta"] is None

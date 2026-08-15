@@ -1,0 +1,97 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys race onto the same box; queue them instead of
+# interleaving rsync writes.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - run: python -m pytest tests/ -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load deploy key
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pinned host key — never StrictHostKeyChecking=no, which would let
+          # anything answering on that IP receive the deploy.
+          printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sync code
+        # The excludes are load-bearing, not tidiness:
+        #   data/ — the snapshot time series. Instagram cannot re-serve historical
+        #           metrics, so --delete reaching it would be permanent loss.
+        #   .env  — the only copy of IG_TOKEN and ANTHROPIC_API_KEY.
+        #   venv/ — built on the server; a runner-built venv would not work there.
+        run: |
+          rsync -az --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'venv' \
+            --exclude 'data' \
+            --exclude '.env' \
+            --exclude '__pycache__' \
+            --exclude '.pytest_cache' \
+            --exclude '*.pyc' \
+            ./ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/ig-analyzer/
+
+      - name: Install deps and restart
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -euo pipefail -s' <<'REMOTE'
+            cd /opt/ig-analyzer
+            ./venv/bin/pip install -q -r requirements.txt
+            sudo -n systemctl restart ig-dashboard
+          REMOTE
+
+      - name: Verify
+        # Fail the deploy loudly if the service came back unhealthy, rather than
+        # reporting green over a broken dashboard.
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -euo pipefail -s' <<'REMOTE'
+            healthy=no
+            for i in $(seq 1 10); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
+                     http://127.0.0.1:5000/api/v1/health || true)
+              if [ "$code" = "200" ]; then
+                echo "healthy after ${i}s"
+                healthy=yes
+                break
+              fi
+              sleep 1
+            done
+            if [ "$healthy" != "yes" ]; then
+              echo "unhealthy after 10s: last HTTP $code"
+              # Exactly the command permitted in /etc/sudoers.d/deploy-ig —
+              # extra flags would be refused, so pipe to tail instead.
+              sudo -n systemctl status ig-dashboard | tail -20 || true
+              exit 1
+            fi
+            curl -s --max-time 5 http://127.0.0.1:5000/api/v1/health
+            echo
+            curl -s -o /dev/null -w 'dashboard / -> HTTP %{http_code}\n' --max-time 10 http://127.0.0.1:5000/
+          REMOTE

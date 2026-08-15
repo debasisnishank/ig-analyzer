@@ -23,6 +23,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 
+import chat
 import store
 
 api = Blueprint("api", __name__, url_prefix="/api/v1")
@@ -133,6 +134,36 @@ def run_detail(run_id: str):
             "collection_errors": snapshot.get("collection_errors", []),
         }
     )
+
+
+@api.post("/ask")
+@require_token
+def ask():
+    """Answer a free-form question about the account from stored data.
+
+    The one endpoint here that is not read-only: it spends a model call. Hence
+    the daily cap in chat.py — this surface is reachable from the internet, and
+    a leaked token should not be able to run up an unbounded bill.
+    """
+    payload = request.get_json(silent=True) or {}
+    question = payload.get("question", "")
+    if not isinstance(question, str):
+        return _error("question must be a string", 400, code="bad_request")
+
+    try:
+        return jsonify(chat.ask(question))
+    except chat.RateLimited as exc:
+        return _error(str(exc), 429, code="rate_limited")
+    except chat.ChatError as exc:
+        return _error(str(exc), 400, code="chat_error")
+
+
+@api.get("/ask/usage")
+@require_token
+def ask_usage():
+    """How many questions today, and the cap. Lets a client warn before asking."""
+    used, limit = chat.usage_today()
+    return jsonify({"used_today": used, "daily_limit": limit, "remaining": max(0, limit - used)})
 
 
 @api.get("/series")

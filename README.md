@@ -177,19 +177,52 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:5000/api/v1/summary
 | `GET /api/v1/runs?limit=N` | Runs, newest first |
 | `GET /api/v1/runs/<id>` | One run: report markdown, metrics, trends, audience |
 | `GET /api/v1/series?metric=followers` | One metric over time, for charting |
+| `POST /api/v1/ask` | Ask a free-form question — `{"question": "..."}` |
+| `GET /api/v1/ask/usage` | Questions used today and the remaining budget |
 
 Run ids look like `2026-08-11_225933`. Reports come back as **markdown**, not
 HTML — every mobile toolkit renders it, and it keeps presentation out of the API.
 
-The API is read-only on purpose: a collection plus analysis takes about two
-minutes, so a phone should never be blocked on one. Cron produces runs; the API
-serves what is already stored.
+Every endpoint except `/ask` is read-only: a collection plus analysis takes about
+two minutes, so a phone should never be blocked on one. Cron produces runs; the
+API serves what is already stored.
+
+## Ask — questions the daily report didn't answer
+
+The scheduled report answers the questions `build_prompt()` decided to ask.
+`/ask` answers the ones you think of afterwards, grounded in the same snapshots.
+
+```bash
+curl -X POST http://127.0.0.1:5000/api/v1/ask \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"question": "Which format held up best on weekends?"}'
+```
+
+There is also a chat view at `/ask` in the dashboard, with suggested questions.
+
+It reads only what cron already collected, so a question costs one model call and
+no Instagram quota, and it follows whatever `LLM_PROVIDER`/`LLM_MODEL` you have
+configured. Because it spends money on a surface that may be internet-reachable,
+answers are capped per day:
+
+| Variable | Default | What |
+|---|---|---|
+| `CHAT_DAILY_LIMIT` | `50` | Questions per day before `/ask` returns 429 |
+| `CHAT_MAX_QUESTION_CHARS` | `500` | Longest accepted question |
+
+The counter lives in `data/chat_usage.json` and resets at midnight UTC.
+
+⚠️ Answers are only as good as the stored data. With a handful of runs, most
+splits are too small to conclude from — the prompt tells the model to say so
+rather than dress a two-post sample up as a finding.
 
 ## Layout
 
 ```
 main.py          Core pipeline: collect → derive → analyze → store
 store.py         Shared read layer (used by both readers below)
+chat.py          Free-form Q&A over stored data, with a daily spend cap
 api.py           JSON API at /api/v1 (token auth)
 dashboard.py     Flask app: HTML dashboard + mounts the API
 query.py         CLI to browse stored analyses

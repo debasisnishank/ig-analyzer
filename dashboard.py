@@ -19,8 +19,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, abort, render_template
+from flask import Flask, Response, abort, jsonify, render_template, request
 
+import chat
 import store
 from api import api as api_blueprint
 
@@ -244,6 +245,42 @@ def trends() -> str:
         rows=rows[::-1],
         last_run=store.last_run_at(rows),
     )
+
+
+@app.route("/ask")
+def ask_page() -> str:
+    used, limit = chat.usage_today()
+    rows = store.snapshots()
+    return render_template(
+        "ask.html",
+        handle=HANDLE,
+        active="ask",
+        runs=len(store.list_runs()),
+        remaining=max(0, limit - used),
+        daily_limit=limit,
+        max_chars=chat.MAX_QUESTION_CHARS,
+        last_run=store.last_run_at(rows),
+    )
+
+
+@app.post("/ask")
+def ask_submit() -> tuple[Response, int] | Response:
+    """Browser-facing counterpart to /api/v1/ask.
+
+    No bearer token here: this route is only reachable through the same gate as
+    the rest of the HTML, whereas the API surface has its own. Answers come back
+    as rendered HTML so the page uses the identical markdown path as the reports
+    — escaped first, so a model answer quoting a caption can't inject script.
+    """
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = chat.ask(payload.get("question", ""))
+    except chat.RateLimited as exc:
+        return jsonify({"error": {"message": str(exc)}}), 429
+    except chat.ChatError as exc:
+        return jsonify({"error": {"message": str(exc)}}), 400
+    result["answer_html"] = _render_md(result["answer"])
+    return jsonify(result)
 
 
 @app.route("/download/<date>/<filename>")

@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Ask — {{ handle }}{% endblock %}
+
+{% block content %}
+<style>
+  /* One column of exchanges, newest at the bottom, composer pinned under it —
+     the shape every messaging app already taught the thumb. */
+  .askwrap { display: flex; flex-direction: column; gap: .9rem; }
+
+  .qa { display: flex; flex-direction: column; gap: .55rem; }
+  .bubble-q {
+    align-self: flex-end; max-width: 88%;
+    background: var(--raised); border: 1px solid var(--hairline-2);
+    border-radius: var(--r) var(--r) var(--r-sm) var(--r);
+    padding: .55rem .75rem; font-size: .86rem; color: var(--ink);
+    overflow-wrap: break-word;
+  }
+  .bubble-a { border-radius: var(--r); }
+  .bubble-a .meta {
+    display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+    margin-top: .9rem; padding-top: .6rem; border-top: 1px solid var(--hairline);
+    font-family: var(--mono); font-size: .58rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+
+  .composer {
+    position: sticky; bottom: 0; z-index: 10;
+    background: linear-gradient(to top, var(--ground) 72%, transparent);
+    padding: .7rem 0 calc(.5rem + env(safe-area-inset-bottom));
+  }
+  .composer form { display: flex; gap: .45rem; align-items: flex-end; }
+  .composer textarea {
+    flex: 1; min-height: var(--tap); max-height: 40vh;
+    padding: .65rem .75rem; resize: none;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--hairline-2); border-radius: var(--r);
+    font-family: var(--mono); font-size: 16px; /* 16px stops iOS zooming on focus */
+    line-height: 1.45;
+  }
+  .composer textarea::placeholder { color: var(--ink-3); }
+  .composer button {
+    min-height: var(--tap); min-width: 62px; padding: 0 .9rem;
+    background: var(--data-lit); color: var(--ground);
+    border: 1px solid var(--data-lit); border-radius: var(--r);
+    font-family: var(--mono); font-size: .72rem; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+  }
+  .composer button[disabled] { opacity: .45; cursor: default; }
+
+  .budget {
+    display: flex; justify-content: space-between; gap: .5rem;
+    font-size: .58rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-3); margin-bottom: .4rem;
+  }
+  .budget .over { color: var(--neg); }
+
+  .err {
+    background: var(--surface); border: 1px solid var(--neg);
+    border-left-width: 2px; border-radius: var(--r-sm);
+    padding: .6rem .75rem; font-size: .78rem; color: #F0B4B6;
+  }
+
+  .thinking { display: flex; align-items: center; gap: .5rem; color: var(--ink-3); font-size: .76rem; }
+  .thinking .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--data-lit);
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
+
+  .starters { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .starters button {
+    background: var(--surface); color: var(--ink-2);
+    border: 1px solid var(--hairline); border-radius: var(--r-sm);
+    padding: .45rem .6rem; font-family: var(--mono); font-size: .7rem;
+    cursor: pointer; text-align: left;
+  }
+</style>
+
+<div class="askwrap">
+  <div>
+    <h2 class="sec">Ask about @{{ handle }}</h2>
+    <div class="budget">
+      <span>{{ runs }} run{{ '' if runs == 1 else 's' }} of data</span>
+      <span id="budget" class="{{ 'over' if remaining == 0 }}">{{ remaining }}/{{ daily_limit }} left today</span>
+    </div>
+  </div>
+
+  {% if runs == 0 %}
+    <div class="empty">
+      <strong>Nothing to ask about yet</strong>
+      Run <code>main.py</code> once and the answers will have data behind them.
+    </div>
+  {% else %}
+    <div class="starters" id="starters">
+      <button type="button">Which format performs best, and is the sample big enough to trust?</button>
+      <button type="button">What changed since the last run?</button>
+      <button type="button">What should I post this week?</button>
+      <button type="button">Which posts underperformed, and what did they have in common?</button>
+    </div>
+
+    <div id="thread" class="askwrap"></div>
+
+    <div class="composer">
+      <form id="askform">
+        <textarea id="q" rows="1" maxlength="{{ max_chars }}"
+                  placeholder="Ask anything about this account…"
+                  aria-label="Your question"></textarea>
+        <button type="submit" id="send">Ask</button>
+      </form>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById('askform');
+  if (!form) return;
+
+  const q = document.getElementById('q');
+  const send = document.getElementById('send');
+  const thread = document.getElementById('thread');
+  const budget = document.getElementById('budget');
+  const limit = {{ daily_limit }};
+
+  // Grow the box with the question instead of scrolling a one-line field.
+  const autosize = () => {
+    q.style.height = 'auto';
+    q.style.height = Math.min(q.scrollHeight, window.innerHeight * 0.4) + 'px';
+  };
+  q.addEventListener('input', autosize);
+
+  document.getElementById('starters')?.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    q.value = b.textContent.trim();
+    autosize();
+    q.focus();
+  });
+
+  // Enter sends, Shift+Enter makes a newline — but only where there is a real
+  // keyboard. On touch, Enter must stay a newline or the thumb cannot reach it.
+  q.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  const el = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const question = q.value.trim();
+    if (!question) return;
+
+    const block = el('div', 'qa');
+    block.appendChild(el('div', 'bubble-q', question));
+    const pending = el('div', 'thinking');
+    pending.appendChild(el('span', 'dot'));
+    pending.appendChild(el('span', null, 'Reading your data…'));
+    block.appendChild(pending);
+    thread.appendChild(block);
+    block.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+    q.value = '';
+    autosize();
+    send.disabled = true;
+
+    try {
+      const res = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json();
+      pending.remove();
+
+      if (!res.ok) {
+        block.appendChild(el('div', 'err', (data.error && data.error.message) || 'Something went wrong.'));
+      } else {
+        const a = el('div', 'report bubble-a');
+        // Server-rendered markdown; it escapes HTML before converting, the same
+        // path the report views use.
+        a.innerHTML = data.answer_html;
+        const meta = el('div', 'meta');
+        meta.appendChild(el('span', null, data.model || ''));
+        a.appendChild(meta);
+        block.appendChild(a);
+        if (typeof data.questions_used_today === 'number') {
+          const left = Math.max(0, limit - data.questions_used_today);
+          budget.textContent = left + '/' + limit + ' left today';
+          budget.classList.toggle('over', left === 0);
+        }
+      }
+    } catch (err) {
+      pending.remove();
+      block.appendChild(el('div', 'err', 'Could not reach the server. Check your connection and try again.'));
+    } finally {
+      send.disabled = false;
+      block.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  });
+})();
+</script>
+{% endblock %}

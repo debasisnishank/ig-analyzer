@@ -3,39 +3,6 @@
 {% block title %}{{ handle }} — Latest report{% endblock %}
 
 {% block content %}
-  <style>
-    .syncbar { display: flex; align-items: center; gap: .7rem; margin-bottom: 1.1rem; }
-    .syncbtn {
-      display: inline-flex; align-items: center; gap: .5rem; min-height: 36px;
-      background: var(--surface); color: var(--ink);
-      border: 1px solid var(--hairline-2); border-radius: var(--r-sm);
-      padding: .4rem .85rem; font-family: var(--mono); font-size: .66rem;
-      letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
-    }
-    .syncbtn:hover { border-color: var(--data); }
-    .syncbtn:disabled { opacity: .6; cursor: default; }
-    .syncbtn .ico {
-      width: 8px; height: 8px; border-radius: 50%; flex: none;
-      background: var(--data-lit); box-shadow: 0 0 6px rgba(233,169,59,.6);
-    }
-    .syncbtn.busy .ico {
-      width: 12px; height: 12px; background: transparent; box-shadow: none;
-      border: 2px solid var(--hairline-2); border-top-color: var(--data-lit);
-      animation: syncspin 1s linear infinite;
-    }
-    @keyframes syncspin { to { transform: rotate(360deg); } }
-    .syncmsg { font-size: .68rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-    .syncmsg.err { color: var(--neg); }
-    @media (prefers-reduced-motion: reduce) { .syncbtn.busy .ico { animation: none; } }
-  </style>
-
-  <div class="syncbar">
-    <button id="syncBtn" class="syncbtn" type="button">
-      <span class="ico" aria-hidden="true"></span> Sync now
-    </button>
-    <span id="syncMsg" class="syncmsg" role="status" aria-live="polite"></span>
-  </div>
-
   {% include "_stats.html" %}
 
   {% if analyses|length > 1 %}
@@ -63,47 +30,8 @@
     {% else %}
       <div class="empty">
         <strong>No reports yet</strong>
-        Tap <em>Sync now</em>, or run <code>python main.py</code>, to collect the first snapshot.
+        Tap the ⟳ button (top-right), or run <code>python main.py</code>, to collect the first snapshot.
       </div>
     {% endif %}
   </section>
-{% endblock %}
-
-{% block scripts %}
-<script>
-  (function () {
-    var btn = document.getElementById('syncBtn');
-    var msg = document.getElementById('syncMsg');
-    var timer = null;
-
-    function busy(on) { btn.disabled = on; btn.classList.toggle('busy', on); }
-    function say(text, isErr) { msg.textContent = text || ''; msg.className = 'syncmsg' + (isErr ? ' err' : ''); }
-
-    function poll() {
-      fetch('/sync/status').then(function (r) { return r.json(); }).then(function (s) {
-        if (s.state === 'running') { busy(true); say(s.message || 'Collecting… (~2 min)'); return; }
-        if (timer) { clearInterval(timer); timer = null; }
-        busy(false);
-        if (s.state === 'done') { say('Done — refreshing…'); setTimeout(function () { location.reload(); }, 800); }
-        else if (s.state === 'error') { say(s.message || 'Sync failed', true); }
-        else { say(''); }
-      }).catch(function () {});
-    }
-    function startPolling() { if (!timer) { timer = setInterval(poll, 4000); } }
-
-    btn.addEventListener('click', function () {
-      busy(true); say('Starting…');
-      fetch('/sync', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (s) {
-        if (s.started) { say(s.message || 'Collecting… (~2 min)'); startPolling(); }
-        else { busy(false); say(s.message || 'Cannot sync right now.', true); }
-      }).catch(function () { busy(false); say('Request failed.', true); });
-    });
-
-    // Reflect an already-running sync (e.g. started in another tab) on load.
-    fetch('/sync/status').then(function (r) { return r.json(); }).then(function (s) {
-      if (s.state === 'running') { busy(true); say(s.message || 'Collecting… (~2 min)'); startPolling(); }
-      else if (s.state === 'error') { say(s.message || 'Last sync failed', true); }
-    }).catch(function () {});
-  })();
-</script>
 {% endblock %}

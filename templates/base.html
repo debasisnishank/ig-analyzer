@@ -85,14 +85,31 @@
       margin-left: auto; font-size: .68rem; letter-spacing: .08em;
       text-transform: uppercase; color: var(--ink-3);
     }
-    .rail .gear {
-      flex: none; margin-left: .55rem;
+    .rail .gear, .rail .railbtn {
+      flex: none; margin-left: .5rem;
       display: inline-flex; align-items: center; justify-content: center;
       width: 34px; min-height: 30px; color: var(--ink-3);
-      border: 1px solid var(--hairline-2); border-radius: var(--r-sm);
+      background: none; border: 1px solid var(--hairline-2);
+      border-radius: var(--r-sm); cursor: pointer;
     }
-    .rail .gear:hover { color: var(--ink); border-color: var(--data); }
-    .rail .out { flex: none; margin: 0 0 0 .45rem; }
+    .rail .gear:hover, .rail .railbtn:hover { color: var(--ink); border-color: var(--data); }
+    .rail .railbtn:disabled { opacity: .55; cursor: default; }
+    .rail .railbtn.busy svg { animation: railspin 1s linear infinite; transform-origin: 50% 50%; }
+    @keyframes railspin { to { transform: rotate(360deg); } }
+    .rail .out { flex: none; margin: 0 0 0 .5rem; }
+
+    /* sync status toast */
+    .toast {
+      position: fixed; left: 50%; bottom: calc(1rem + env(safe-area-inset-bottom));
+      transform: translateX(-50%) translateY(20px);
+      background: var(--raised); border: 1px solid var(--hairline-2); color: var(--ink);
+      border-radius: 999px; padding: .5rem .95rem; font-size: .7rem; letter-spacing: .02em;
+      box-shadow: 0 12px 34px -12px rgba(0,0,0,.75);
+      opacity: 0; pointer-events: none; z-index: 50; max-width: 90vw;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.err { border-color: rgba(220,64,69,.5); color: #F1A6A9; }
     .rail .out button {
       background: none; border: 1px solid var(--hairline-2); color: var(--ink-3);
       font-family: var(--mono); font-size: .58rem; letter-spacing: .1em;
@@ -299,7 +316,17 @@
     <span class="lamp" aria-hidden="true"></span>
     <span class="who">@{{ handle }}</span>
     <span class="when">{% if last_run %}Updated {{ last_run }}{% else %}no runs yet{% endif %}</span>
-    {% if authed %}
+    {# Operator controls: shown when signed in, or when login is off (access is
+       then gated by the proxy). Logout only makes sense when actually signed in. #}
+    {% if authed or not login_enabled %}
+    <button id="syncBtn" class="railbtn" type="button" title="Sync now" aria-label="Sync now">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
     <a class="gear" href="/admin" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -307,9 +334,11 @@
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
     </a>
+    {% if authed %}
     <form class="out" method="post" action="/logout">
       <button type="submit" title="Sign out">Exit</button>
     </form>
+    {% endif %}
     {% endif %}
   </header>
 
@@ -323,6 +352,7 @@
     {% block content %}{% endblock %}
   </main>
   {% block scripts %}{% endblock %}
+  <div id="syncToast" class="toast" role="status" aria-live="polite"></div>
   <script>
     // Register the service worker so the dashboard is installable as a PWA.
     if ('serviceWorker' in navigator) {
@@ -330,6 +360,44 @@
         navigator.serviceWorker.register('/sw.js').catch(function () {});
       });
     }
+
+    // Sync now — trigger an on-demand collection and show progress. Present on
+    // every page via the rail button; no-ops when not signed in.
+    (function () {
+      var btn = document.getElementById('syncBtn');
+      if (!btn) return;
+      var toast = document.getElementById('syncToast');
+      var timer = null;
+      function busy(on) { btn.disabled = on; btn.classList.toggle('busy', on); }
+      function show(text, err) {
+        if (!toast) return;
+        toast.textContent = text || '';
+        toast.className = 'toast on' + (err ? ' err' : '');
+      }
+      function hide() { if (toast) toast.className = 'toast'; }
+      function poll() {
+        fetch('/sync/status').then(function (r) { return r.json(); }).then(function (s) {
+          if (s.state === 'running') { busy(true); show(s.message || 'Collecting… (~2 min)'); return; }
+          if (timer) { clearInterval(timer); timer = null; }
+          busy(false);
+          if (s.state === 'done') { show('Done — refreshing…'); setTimeout(function () { location.reload(); }, 900); }
+          else if (s.state === 'error') { show(s.message || 'Sync failed', true); setTimeout(hide, 6000); }
+          else { hide(); }
+        }).catch(function () {});
+      }
+      function startPoll() { if (!timer) { timer = setInterval(poll, 4000); } }
+      btn.addEventListener('click', function () {
+        busy(true); show('Starting…');
+        fetch('/sync', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (s) {
+          if (s.started) { show(s.message || 'Collecting… (~2 min)'); startPoll(); }
+          else { busy(false); show(s.message || 'Cannot sync right now.', true); setTimeout(hide, 5000); }
+        }).catch(function () { busy(false); show('Request failed.', true); setTimeout(hide, 5000); });
+      });
+      // Reflect an already-running sync (e.g. started elsewhere) on load.
+      fetch('/sync/status').then(function (r) { return r.json(); }).then(function (s) {
+        if (s.state === 'running') { busy(true); show(s.message || 'Collecting… (~2 min)'); startPoll(); }
+      }).catch(function () {});
+    })();
   </script>
 </body>
 </html>

@@ -40,6 +40,7 @@ from flask import (
 import chat
 import settings
 import store
+import sync
 from api import api as api_blueprint
 
 try:
@@ -150,6 +151,22 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.post("/sync")
+def sync_start() -> tuple[Response, int] | Response:
+    """Trigger an on-demand collection in the background (behind the login gate)."""
+    started, message = sync.start()
+    # start()'s message is the action result — keep it last so status()'s own
+    # 'message' field can't overwrite it.
+    payload = {**sync.status(), "started": started, "message": message}
+    return jsonify(payload), (202 if started else 429)
+
+
+@app.get("/sync/status")
+def sync_status() -> Response:
+    """Poll the current sync state so the page can show progress."""
+    return jsonify(sync.status())
 
 
 @app.route("/admin", methods=["GET", "POST"])

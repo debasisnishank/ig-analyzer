@@ -12,7 +12,7 @@
         {% for a in analyses %}
           <a class="run" href="/analysis/{{ a.date }}/{{ a.filename }}"
              {% if loop.first %}aria-current="page"{% endif %}>
-            <span class="d">{{ a.date[5:] }}</span>
+            <span class="d">{{ a.day }}</span>
             <span class="t">{{ a.time }}</span>
           </a>
         {% endfor %}
@@ -23,7 +23,7 @@
   <section aria-label="Latest report">
     {% if latest_html %}
       <h2 class="sec">
-        Latest report · {{ latest_meta.date }} {{ latest_meta.time }}
+        Latest report · {{ latest_meta.day }} at {{ latest_meta.time }}
         · <a href="/download/{{ latest_meta.date }}/{{ latest_meta.filename }}">raw JSON</a>
       </h2>
       <article class="report">{{ latest_html|safe }}</article>

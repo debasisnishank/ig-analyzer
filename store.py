@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,66 @@ METRICS: dict[str, dict[str, Any]] = {
     "reach": {"label": "Reach per post", "precision": 0},
     "posts": {"label": "Posts in window", "precision": 0},
 }
+
+
+# --------------------------------------------------------------------------- #
+# Human-friendly time
+# --------------------------------------------------------------------------- #
+# Timestamps are stored in UTC. Relative phrasing ("3 hours ago") reads
+# naturally and avoids showing a UTC clock time that looks wrong to a reader in
+# another timezone.
+
+
+def _parse_dt(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    text = str(value).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def humanize_ago(value: str | None) -> str | None:
+    """A timestamp as relative time: 'just now', '5 min ago', '3 hours ago',
+    'yesterday', '4 days ago', or 'on 12 Aug' once it's over a week old."""
+    dt = _parse_dt(value)
+    if dt is None:
+        return None
+    seconds = max(0.0, (datetime.now(timezone.utc) - dt).total_seconds())
+    if seconds < 45:
+        return "just now"
+    minutes = seconds / 60
+    if minutes < 45:
+        n = round(minutes)
+        return f"{n} min ago"
+    hours = minutes / 60
+    if hours < 22:
+        n = round(hours)
+        return f"{n} hour{'s' if n != 1 else ''} ago"
+    days = hours / 24
+    if days < 1.5:
+        return "yesterday"
+    if days < 7:
+        return f"{round(days)} days ago"
+    return "on " + f"{dt.day} {dt.strftime('%b')}"
+
+
+def humanize_day(date_str: str) -> str:
+    """A YYYY-MM-DD date as 'Today', 'Yesterday', or '21 Aug'."""
+    try:
+        day = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return date_str
+    delta = (datetime.now(timezone.utc).date() - day).days
+    if delta == 0:
+        return "Today"
+    if delta == 1:
+        return "Yesterday"
+    return f"{day.day} {day.strftime('%b')}"
 
 
 # --------------------------------------------------------------------------- #
@@ -83,6 +144,7 @@ def list_runs() -> list[dict[str, str]]:
             {
                 "id": rid,
                 "date": f.parent.name,
+                "day": humanize_day(f.parent.name),
                 "filename": f.name,
                 "time": f"{stamp[:2]}:{stamp[2:4]}",
                 "size_bytes": f.stat().st_size,
@@ -127,10 +189,14 @@ def snapshots() -> list[dict[str, Any]]:
             continue
         overall = (data.get("derived") or {}).get("overall") or {}
         collected = data.get("collected_at") or ""
+        at_human = ""
+        if collected:
+            at_human = f"{humanize_day(collected[:10])} · {collected[11:16]}"
         rows.append(
             {
                 "collected_at": collected,
                 "at": collected[:16].replace("T", " "),
+                "at_human": at_human,
                 "followers": (data.get("account") or {}).get("followers_count"),
                 "posts": len(data.get("media") or []),
                 "engagement": overall.get("avg_engagement_rate"),
@@ -209,3 +275,8 @@ def stat_row(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def last_run_at(rows: list[dict[str, Any]]) -> str | None:
     return rows[-1]["at"] if rows else None
+
+
+def last_run_human(rows: list[dict[str, Any]]) -> str | None:
+    """The newest run as relative time, e.g. '3 hours ago'."""
+    return humanize_ago(rows[-1]["collected_at"]) if rows else None

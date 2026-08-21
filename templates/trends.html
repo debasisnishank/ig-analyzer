@@ -52,7 +52,7 @@
         <table class="data">
           <thead>
             <tr>
-              <th scope="col">Collected (UTC)</th>
+              <th scope="col">Collected</th>
               <th scope="col">Followers</th>
               <th scope="col">Eng. rate</th>
               <th scope="col">Reach/post</th>
@@ -62,7 +62,7 @@
           <tbody>
             {% for r in rows %}
               <tr>
-                <td>{{ r.at }}</td>
+                <td>{{ r.at_human }}</td>
                 <td>{{ r.followers if r.followers is not none else '—' }}</td>
                 <td>{{ r.engagement if r.engagement is not none else '—' }}</td>
                 <td>{{ r.reach if r.reach is not none else '—' }}</td>

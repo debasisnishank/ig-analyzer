@@ -9,7 +9,7 @@
       {% for a in analyses %}
         <a class="run" href="/analysis/{{ a.date }}/{{ a.filename }}"
            {% if a.date == date and a.filename == filename %}aria-current="page"{% endif %}>
-          <span class="d">{{ a.date[5:] }}</span>
+          <span class="d">{{ a.day }}</span>
           <span class="t">{{ a.time }}</span>
         </a>
       {% endfor %}

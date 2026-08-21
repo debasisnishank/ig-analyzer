@@ -213,7 +213,7 @@ def admin():
         "admin.html",
         handle=HANDLE,
         active="admin",
-        last_run=store.last_run_at(store.snapshots()),
+        last_run=store.last_run_human(store.snapshots()),
         saved=saved,
         errors=errors,
         current_model=current_model,
@@ -403,7 +403,7 @@ def home() -> str:
         stats=_view_stats(rows),
         latest_html=latest_html,
         latest_meta=latest_meta,
-        last_run=store.last_run_at(rows),
+        last_run=store.last_run_human(rows),
     )
 
 
@@ -418,7 +418,7 @@ def analysis(date: str, filename: str) -> str:
         html=_render_md(path.read_text()),
         date=date,
         filename=filename,
-        last_run=store.last_run_at(rows),
+        last_run=store.last_run_human(rows),
     )
 
 
@@ -435,7 +435,7 @@ def trends() -> str:
             _line_chart(rows, "reach", "Reach per post"),
         ],
         rows=rows[::-1],
-        last_run=store.last_run_at(rows),
+        last_run=store.last_run_human(rows),
     )
 
 
@@ -451,7 +451,7 @@ def ask_page() -> str:
         remaining=max(0, limit - used),
         daily_limit=limit,
         max_chars=chat.MAX_QUESTION_CHARS,
-        last_run=store.last_run_at(rows),
+        last_run=store.last_run_human(rows),
     )
 
 

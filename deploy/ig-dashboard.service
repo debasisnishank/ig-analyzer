@@ -13,8 +13,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Adjust User/WorkingDirectory to match the box if different.
-User=www-data
+# Runs as `deploy` — the same user as the cron job. This matters: the "Sync now"
+# button spawns main.py as this user, so it must be the account that owns
+# /opt/ig-analyzer/data and holds the cmdc auth (~/.commandcode/auth.json).
+User=deploy
 WorkingDirectory=/opt/ig-analyzer
 Environment=DASHBOARD_HOST=127.0.0.1
 Environment=DASHBOARD_PORT=5000

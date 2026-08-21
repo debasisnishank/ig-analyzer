@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0B0E14" />
   <title>{% block title %}{{ handle }} — Analyzer{% endblock %}</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="IG Analyzer" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <style>
     /* ---------------------------------------------------------------
        Night instrument cluster. Amber backlight on a deep blue-black,
@@ -76,6 +85,21 @@
       margin-left: auto; font-size: .68rem; letter-spacing: .08em;
       text-transform: uppercase; color: var(--ink-3);
     }
+    .rail .gear {
+      flex: none; margin-left: .55rem;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; min-height: 30px; color: var(--ink-3);
+      border: 1px solid var(--hairline-2); border-radius: var(--r-sm);
+    }
+    .rail .gear:hover { color: var(--ink); border-color: var(--data); }
+    .rail .out { flex: none; margin: 0 0 0 .45rem; }
+    .rail .out button {
+      background: none; border: 1px solid var(--hairline-2); color: var(--ink-3);
+      font-family: var(--mono); font-size: .58rem; letter-spacing: .1em;
+      text-transform: uppercase; padding: .3rem .5rem; border-radius: var(--r-sm);
+      min-height: 30px; cursor: pointer;
+    }
+    .rail .out button:hover { color: var(--ink); border-color: var(--data); }
 
     /* ---- segmented nav -------------------------------------------- */
     nav.seg {
@@ -275,6 +299,18 @@
     <span class="lamp" aria-hidden="true"></span>
     <span class="who">@{{ handle }}</span>
     <span class="when">{% if last_run %}{{ last_run }}{% else %}no runs{% endif %}</span>
+    {% if authed %}
+    <a class="gear" href="/admin" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </a>
+    <form class="out" method="post" action="/logout">
+      <button type="submit" title="Sign out">Exit</button>
+    </form>
+    {% endif %}
   </header>
 
   <nav class="seg" aria-label="Views">
@@ -287,5 +323,13 @@
     {% block content %}{% endblock %}
   </main>
   {% block scripts %}{% endblock %}
+  <script>
+    // Register the service worker so the dashboard is installable as a PWA.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () {});
+      });
+    }
+  </script>
 </body>
 </html>

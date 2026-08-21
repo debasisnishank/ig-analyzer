@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Settings — {{ handle }}{% endblock %}
+
+{% block content %}
+<style>
+  .admin { max-width: 560px; }
+  .admin .card {
+    background: var(--surface); border: 1px solid var(--hairline);
+    border-radius: var(--r); padding: 1.1rem 1.05rem 1.2rem; margin-bottom: 1rem;
+  }
+  .admin .card h3 {
+    margin: 0 0 .2rem; font-size: .82rem; letter-spacing: .01em; color: var(--ink);
+    font-weight: 600;
+  }
+  .admin .card .hint {
+    margin: 0 0 .8rem; font-size: .7rem; color: var(--ink-3); line-height: 1.5;
+  }
+  .admin label {
+    display: block; font-size: .58rem; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--ink-3); margin: .7rem 0 .35rem;
+  }
+  .admin input {
+    width: 100%; min-height: var(--tap);
+    background: var(--ground); color: var(--ink);
+    border: 1px solid var(--hairline-2); border-radius: var(--r-sm);
+    padding: .55rem .75rem; font-family: var(--mono); font-size: .92rem; letter-spacing: .03em;
+  }
+  .admin input:focus-visible {
+    outline: none; border-color: var(--data-lit);
+    box-shadow: 0 0 0 1px var(--data-lit);
+  }
+  .admin .state {
+    display: inline-flex; align-items: center; gap: .35rem;
+    font-size: .62rem; letter-spacing: .04em; color: var(--ink-2);
+    background: var(--raised); border: 1px solid var(--hairline);
+    border-radius: 999px; padding: .2rem .55rem; margin-top: .1rem;
+  }
+  .admin .state .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .admin .state .dot.on { background: var(--pos); }
+  .admin .state .dot.off { background: var(--ink-3); }
+  .admin .save {
+    width: 100%; min-height: var(--tap); margin-top: .3rem;
+    background: var(--data-lit); color: #1A1206; border: 1px solid var(--data-lit);
+    border-radius: var(--r-sm); font-family: var(--mono); font-weight: 700;
+    font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; cursor: pointer;
+  }
+  .admin .save:active { transform: translateY(1px); }
+  .admin .banner {
+    border-radius: var(--r-sm); padding: .6rem .75rem; margin-bottom: 1rem;
+    font-size: .74rem; line-height: 1.5;
+  }
+  .admin .banner.ok { background: rgba(47,150,104,.12); border: 1px solid rgba(47,150,104,.45); color: #8FD3B4; }
+  .admin .banner.err { background: rgba(220,64,69,.10); border: 1px solid rgba(220,64,69,.4); color: #F1A6A9; }
+  .admin .readout { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-bottom: 1rem; }
+  .admin .readout .k { font-size: .55rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+  .admin .readout .v { font-size: .8rem; margin-top: .2rem; word-break: break-all; }
+</style>
+
+<section class="admin">
+  <h2 class="sec">Settings</h2>
+
+  {% if saved %}
+    <p class="banner ok">Saved: {{ saved | join(", ") }}. Model and token apply on the next analysis; a new password applies to the next sign-in.</p>
+  {% endif %}
+  {% for e in errors %}
+    <p class="banner err">{{ e }}</p>
+  {% endfor %}
+
+  <div class="readout">
+    <div class="card" style="margin:0">
+      <div class="k">Provider</div><div class="v">{{ provider }}</div>
+    </div>
+    <div class="card" style="margin:0">
+      <div class="k">Model</div><div class="v">{{ current_model }}</div>
+    </div>
+  </div>
+
+  <form method="post" action="/admin" autocomplete="off">
+    <div class="card">
+      <h3>Model</h3>
+      <p class="hint">The model id used for the daily analysis and the Ask page.</p>
+      <label for="model">Model id</label>
+      <input id="model" name="model" type="text" value="{{ current_model }}"
+             placeholder="e.g. claude-sonnet-4-5" spellcheck="false" />
+    </div>
+
+    <div class="card">
+      <h3>AI token</h3>
+      <p class="hint">
+        The API key for the model provider. Write-only — leave blank to keep the current one.
+        <span class="state"><span class="dot {{ 'on' if token_configured else 'off' }}"></span>
+        {{ "configured" if token_configured else "not set" }}</span>
+      </p>
+      <label for="ai_token">New AI token</label>
+      <input id="ai_token" name="ai_token" type="password" autocomplete="new-password"
+             placeholder="•••••••• (unchanged)" spellcheck="false" />
+    </div>
+
+    <div class="card">
+      <h3>Dashboard password</h3>
+      <p class="hint">
+        The password for signing in here. Leave blank to keep the current one. Min 6 characters.
+        <span class="state"><span class="dot {{ 'on' if password_source != 'not set' else 'off' }}"></span>
+        {{ password_source }}</span>
+      </p>
+      <label for="new_password">New password</label>
+      <input id="new_password" name="new_password" type="password" autocomplete="new-password"
+             placeholder="•••••••• (unchanged)" />
+      <label for="confirm_password">Confirm new password</label>
+      <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password"
+             placeholder="repeat new password" />
+    </div>
+
+    <button class="save" type="submit">Save changes</button>
+  </form>
+</section>
+{% endblock %}

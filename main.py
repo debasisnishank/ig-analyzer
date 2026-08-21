@@ -887,6 +887,29 @@ def build_prompt(data: dict[str, Any]) -> str:
     )
 
 
+def _refresh_llm_settings() -> None:
+    """Overlay admin-set overrides (data/config.json) onto the LLM globals.
+
+    Lets a model/token change from the dashboard's admin page take effect without
+    editing .env or restarting. Env/.env stays the default when nothing is
+    overridden. Called at the single choke point every analysis passes through.
+    """
+    global LLM_MODEL, LLM_API_KEY, LLM_BASE_URL, LLM_PROVIDER
+    try:
+        import settings
+    except Exception:  # noqa: BLE001 - settings is optional; fall back to env
+        return
+    overrides = settings.llm_overrides()
+    if "LLM_MODEL" in overrides:
+        LLM_MODEL = overrides["LLM_MODEL"]
+    if "LLM_API_KEY" in overrides:
+        LLM_API_KEY = overrides["LLM_API_KEY"]
+    if "LLM_BASE_URL" in overrides:
+        LLM_BASE_URL = (overrides["LLM_BASE_URL"] or "").rstrip("/")
+    if "LLM_PROVIDER" in overrides:
+        LLM_PROVIDER = overrides["LLM_PROVIDER"].lower()
+
+
 def resolve_provider() -> str:
     """Which API dialect to speak: 'anthropic' or 'openai'.
 
@@ -894,6 +917,7 @@ def resolve_provider() -> str:
     OpenRouter, Together, a local server, or a gateway like Command Code. Auto
     means: Claude model ids talk the Anthropic dialect, everything else doesn't.
     """
+    _refresh_llm_settings()  # pick up any admin overrides before every analysis
     if LLM_PROVIDER in ("anthropic", "openai", "cli"):
         return LLM_PROVIDER
     return "anthropic" if LLM_MODEL.startswith("claude") else "openai"

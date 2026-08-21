@@ -1,0 +1,45 @@
+# Caddy reverse proxy for the IG Analyzer dashboard.
+#
+# Public entry point. Caddy is the ONLY thing exposed to the internet; the Flask
+# app stays bound to 127.0.0.1:5000 and is never reachable directly.
+#
+# What this gives you:
+#   * Automatic HTTPS (Let's Encrypt) for the domain below — issued and renewed
+#     with no certbot cron to maintain.
+#   * HTTP basic auth on EVERY route (dashboard, /api, /ask), so nothing is
+#     readable or billable without the password.
+#
+# To change the domain (e.g. to .com), edit the site address on the next line.
+
+ig.debasisnishank.me {
+	# ---- Authentication -----------------------------------------------------
+	# Protects all routes. Generate the hash on the VPS with:
+	#     caddy hash-password
+	# then paste the bcrypt hash below (replace REPLACE_WITH_BCRYPT_HASH).
+	# The username is "debasis" — change if you like.
+	# NOTE: directive is `basic_auth` on Caddy >= 2.8 (what the install in
+	# SETUP.md pulls). On older Caddy it's `basicauth` (no underscore).
+	basic_auth {
+		debasis REPLACE_WITH_BCRYPT_HASH
+	}
+
+	# ---- App ----------------------------------------------------------------
+	reverse_proxy 127.0.0.1:5000
+
+	# ---- Hardening ----------------------------------------------------------
+	header {
+		# Belt-and-suspenders headers; harmless behind auth, useful in general.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	encode gzip
+
+	log {
+		output file /var/log/caddy/ig-analyzer.log
+		format console
+	}
+}

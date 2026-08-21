@@ -1,0 +1,37 @@
+# systemd unit for the IG Analyzer dashboard.
+#
+# This mirrors the service the deploy already restarts (`systemctl restart
+# ig-dashboard`) so it lives in version control instead of only on the box.
+# Install to /etc/systemd/system/ig-dashboard.service (see deploy/SETUP.md).
+#
+# The app binds to 127.0.0.1 only — public access goes through Caddy.
+
+[Unit]
+Description=Instagram Analyzer dashboard (Flask)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust User/WorkingDirectory to match the box if different.
+User=www-data
+WorkingDirectory=/opt/ig-analyzer
+Environment=DASHBOARD_HOST=127.0.0.1
+Environment=DASHBOARD_PORT=5000
+# Serve via gunicorn in production rather than Flask's dev server.
+# `dashboard:app` is the Flask app object in dashboard.py.
+ExecStart=/opt/ig-analyzer/venv/bin/gunicorn \
+    --workers 2 \
+    --bind 127.0.0.1:5000 \
+    --timeout 120 \
+    dashboard:app
+Restart=on-failure
+RestartSec=3
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

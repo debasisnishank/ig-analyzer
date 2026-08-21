@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B0E14" />
+  <title>Sign in — {{ handle }} Analyzer</title>
+
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="IG Analyzer" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --ground: #0B0E14; --surface: #141922; --raised: #1B2230;
+      --hairline: #232B38; --hairline-2: #2E3949;
+      --ink: #E6EBF2; --ink-2: #93A1B5; --ink-3: #647287;
+      --data: #C28009; --data-lit: #E9A93B; --neg: #DC4045;
+      --r-sm: 6px; --tap: 44px;
+      --display: "Chakra Petch", "Bahnschrift", "DIN Alternate", system-ui, sans-serif;
+      --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0; min-height: 100svh;
+      background:
+        radial-gradient(130% 90% at 50% -20%, rgba(194,128,9,.12), transparent 55%),
+        var(--ground);
+      color: var(--ink); font-family: var(--mono);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem calc(1rem + env(safe-area-inset-left)) calc(1.5rem + env(safe-area-inset-bottom));
+    }
+
+    .card {
+      width: 100%; max-width: 340px;
+      background: linear-gradient(180deg, #161C27 0%, var(--surface) 100%);
+      border: 1px solid var(--hairline);
+      border-radius: 16px; padding: 2rem 1.5rem 1.6rem;
+      box-shadow: 0 24px 60px -24px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.03);
+    }
+
+    /* ---- identity lockup ---- */
+    .brand { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .avatar {
+      position: relative; width: 76px; height: 76px; border-radius: 50%;
+      display: grid; place-items: center;
+    }
+    .avatar img {
+      width: 76px; height: 76px; border-radius: 50%;
+      object-fit: cover; background: var(--raised);
+      border: 2px solid var(--data); padding: 3px;
+      box-shadow: 0 0 0 1px var(--hairline), 0 0 22px -4px rgba(233,169,59,.45);
+    }
+
+    .eyebrow {
+      margin: 1.1rem 0 .3rem;
+      font-family: var(--mono); font-weight: 500;
+      font-size: .58rem; letter-spacing: .42em; text-indent: .42em;
+      text-transform: uppercase; color: var(--ink-3);
+    }
+    .handle {
+      margin: 0; font-family: var(--display); font-weight: 600;
+      font-size: 1.85rem; line-height: 1; letter-spacing: -.01em; color: var(--ink);
+    }
+    .handle .at { color: var(--data-lit); font-weight: 500; margin-right: .04em; }
+
+    /* thin gauge-sweep divider under the identity */
+    .sweep {
+      width: 100%; height: 1px; margin: 1.5rem 0 1.4rem;
+      background: linear-gradient(90deg, transparent, var(--hairline-2) 18%, var(--data) 50%, var(--hairline-2) 82%, transparent);
+      opacity: .8;
+    }
+
+    /* ---- form ---- */
+    form { display: block; }
+    label {
+      display: block; font-family: var(--mono); font-weight: 500;
+      font-size: .58rem; letter-spacing: .22em; text-transform: uppercase;
+      color: var(--ink-3); margin-bottom: .5rem;
+    }
+    input[type=password] {
+      width: 100%; min-height: var(--tap);
+      background: var(--ground); color: var(--ink);
+      border: 1px solid var(--hairline-2); border-radius: var(--r-sm);
+      padding: .65rem .8rem; font-family: var(--mono); font-weight: 500;
+      font-size: 1rem; letter-spacing: .18em;
+    }
+    input[type=password]::placeholder { color: var(--ink-3); letter-spacing: .3em; }
+    input[type=password]:focus-visible {
+      outline: none; border-color: var(--data-lit);
+      box-shadow: 0 0 0 1px var(--data-lit), 0 0 16px -6px rgba(233,169,59,.6);
+    }
+
+    button {
+      margin-top: 1.15rem; width: 100%; min-height: var(--tap);
+      background: var(--data-lit); color: #1A1206;
+      border: 1px solid var(--data-lit); border-radius: var(--r-sm);
+      font-family: var(--display); font-weight: 600;
+      font-size: .82rem; letter-spacing: .18em; text-transform: uppercase;
+      cursor: pointer; transition: filter .12s ease, transform .05s ease;
+    }
+    button:hover { filter: brightness(1.06); }
+    button:active { transform: translateY(1px); }
+    button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+    .err {
+      margin: 0 0 1.1rem; padding: .6rem .75rem;
+      background: rgba(220,64,69,.10); border: 1px solid rgba(220,64,69,.4);
+      border-radius: var(--r-sm); color: #F1A6A9;
+      font-family: var(--mono); font-size: .72rem; letter-spacing: .02em;
+    }
+
+    /* ---- power-on status line (signature) ---- */
+    .status {
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
+      margin-top: 1.4rem;
+      font-family: var(--mono); font-weight: 500;
+      font-size: .55rem; letter-spacing: .26em; text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .status .lamp {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--data-lit);
+      box-shadow: 0 0 8px 1px rgba(233,169,59,.6);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .status .lamp { animation: none; opacity: 1; }
+      button { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="brand">
+      <div class="avatar">
+        <img src="/profile-pic" alt="@{{ handle }}"
+             onerror="this.onerror=null;this.src='/static/icons/icon-192.png'" />
+      </div>
+      <p class="eyebrow">Ride Telemetry</p>
+      <h1 class="handle"><span class="at">@</span>{{ handle }}</h1>
+    </div>
+
+    <div class="sweep" aria-hidden="true"></div>
+
+    {% if error %}<p class="err" role="alert">{{ error }}</p>{% endif %}
+
+    <form method="post" action="/login">
+      <input type="hidden" name="next" value="{{ next }}" />
+      <label for="password">Passphrase</label>
+      <input id="password" name="password" type="password"
+             autocomplete="current-password" placeholder="••••••••" autofocus required />
+      <button type="submit">Enter dashboard</button>
+    </form>
+
+    <p class="status"><span class="lamp" aria-hidden="true"></span> Secure session</p>
+  </main>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>
